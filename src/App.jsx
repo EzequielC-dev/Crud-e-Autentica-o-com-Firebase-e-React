@@ -1,5 +1,11 @@
-import { useState, useEffect } from "react";
-import { db } from "./services/firebase/firebase";
+import { useState, useEffect, useReducer } from "react";
+import { db, auth } from "./services/firebase/firebase";
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+ } from "firebase/auth"
 import { 
   doc, 
   setDoc,
@@ -9,12 +15,20 @@ import {
   getDocs, 
   updateDoc, 
   deleteDoc,
-  onSnapshot } from "firebase/firestore"
+  onSnapshot,
+} from "firebase/firestore"
+import firebase from "firebase/compat/app";
 
 function App() {
   const [titulo, setTitulo] = useState("");
   const [autor, setAutor] = useState("");
   const [idPost, setIdPost] = useState("");
+
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+
+  const [user, setUser] = useState("");
+  const [userDetail, setUserDetail] = useState("");
 
   const [posts, setPosts] = useState([]);
 
@@ -34,6 +48,26 @@ function App() {
       })
     }
     loadPosts();
+  }, [])
+
+  useEffect(() => {
+    async function checkLogin() {
+        onAuthStateChanged(auth, (user) => {
+          if(user) {
+            //se tem usuário logado ele entra aqui
+            setUser(true);
+            setUserDetail({
+              uid: user.uid,
+              email: user.email,
+            })
+          } else {
+            //não existe nenhum usuário logado
+            setUser(false);
+            setUserDetail({});
+          }
+        })
+    }
+    checkLogin();
   }, [])
 
   async function handleAdd() {
@@ -125,9 +159,74 @@ function App() {
     })
   }
 
+  async function novoUsuario() {
+    await createUserWithEmailAndPassword(auth, email, senha)
+    .then(() => {
+      alert("Cadastro feito com sucesso");
+      setEmail("");
+      setSenha("");
+    })
+    .catch((erro) => {
+      if(erro.code === "auth/weak-password") {
+        alert("Senha muito fraca")
+      } else if(erro.code === "auth/email-already-in-use") {
+        alert("Esse email já existe!")
+      }
+    })
+  }
+
+  async function logarUsuario() {
+    await signInWithEmailAndPassword(auth, email, senha)
+    .then((value) => {
+      // Value = detalhes do usuário que foi logado
+      alert("Logado com sucesso");
+
+      setUserDetail({
+        uid: value.user.uid,
+        email: value.user.email,
+      })
+      setUser(true);
+
+      setEmail("");
+      setSenha("");
+    })
+    .catch((erro) => {
+      console.log(erro);
+    })
+  }
+
+  async function fazerLogout() {
+    await signOut(auth)
+    setUser(false)
+    setUserDetail({})
+  }
+
   return (
     <>
       <div className="flex justify-center">
+
+        <div className="flex flex-col justify-start">
+          <h1>Usuários</h1>
+
+          { user && (
+            <div>
+              <strong>Seja bem-vindo, você está logado!</strong>
+              <span>ID: {userDetail.uid} - Email: {userDetail.email}</span>
+              <button onClick={fazerLogout}>Sair da conta</button>
+              <br />
+            </div>
+          )}
+
+          <label>Email</label>
+          <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Digite seu email"/>
+
+          <label>Senha</label>
+          <input type="text" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="Digite sua senha"/>
+
+          <button onClick={novoUsuario}>Cadastrar</button>
+          <button onClick={logarUsuario}>Fazer Login</button>
+        </div>
+
         <div className="w-[600px] flex flex-col border-solid border-2 border-black">
 
           <label>ID do Post:</label>
